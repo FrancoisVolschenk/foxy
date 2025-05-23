@@ -31,7 +31,7 @@ use openssl::sha::Sha256;
 use serde_json::Value;
 use num_bigint::BigUint;
 use num_traits::{FromPrimitive, ToPrimitive};
-
+use url::quirks::username;
 use crate::core::{
     Filter, FilterType, ProxyRequest, ProxyResponse, ProxyError
 };
@@ -355,16 +355,18 @@ fn determine_server_route(username : String, server_list : &Vec<String>) -> Resu
 
     let mut server_index : i32 = 0;
 
-    if (username != null()) {
-
+    if (!username.is_empty()) {
+        server_index = get_hashed_index(&*username, server_list.len() as i32);
     }
+    
+    Ok(server_list.get(server_index as usize).unwrap().clone())
 }
 
-fn get_hashed_index(user_id: &str, num_servers: i32) -> i32 {
+fn get_hashed_index(username: &str, num_servers: i32) -> i32 {
 
     let mut hasher = Sha256::new();
 
-    hasher.update(user_id.as_bytes());
+    hasher.update(username.as_bytes());
     let hash_bytes = hasher.finish();
 
     let big_int = BigUint::from_bytes_le(&hash_bytes[0..8]);
