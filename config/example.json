@@ -25,9 +25,9 @@
         "type": "route_to_server",
         "config": {
           "server_list": [
-            "server-1",
-            "server-2",
-            "server-3"
+            "/",
+            "/",
+            "/"
           ]
         }
       }
@@ -36,7 +36,7 @@
   "routes": [
     {
       "id": "httpbin-get",
-      "target": "https://httpbin.org",
+      "target": "http://localhost:8000",
       "filters": [
         {
           "type": "path_rewrite",
@@ -72,7 +72,7 @@
     },
     {
       "id": "httpbin-post",
-      "target": "https://httpbin.org",
+      "target": "http://localhost:8000",
       "filters": [
         {
           "type": "path_rewrite",

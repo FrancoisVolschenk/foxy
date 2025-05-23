@@ -24,13 +24,16 @@ use serde::{Serialize, Deserialize};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::ptr::null;
+use std::string::FromUtf8Error;
 use std::sync::RwLock;
 use futures_util::stream::iter;
+use hyper::HeaderMap;
 use hyper::http::HeaderValue;
 use openssl::sha::Sha256;
 use serde_json::Value;
 use num_bigint::BigUint;
 use num_traits::{FromPrimitive, ToPrimitive};
+use reqwest::Body;
 use url::quirks::username;
 use crate::core::{
     Filter, FilterType, ProxyRequest, ProxyResponse, ProxyError
@@ -298,28 +301,60 @@ impl Filter for RouteToServerFilter {
     }
 
     async fn pre_filter(&self, request: ProxyRequest) -> Result<ProxyRequest, ProxyError> {
-        let username = get_username(request).await;
+        let method = request.method;
+        let mut path = request.path;
+        let query = request.query;
+        let mut headers = request.headers;
+        let context = request.context;
+
+        let json_body = serialize_proxy_request_body(request.body).await;
+        
+        log::info!("[server filter] path before server determination{} {}", method, path);
+        
+        let username = get_username(json_body.clone(), &mut headers).await;
         let server_route = determine_server_route(username?, &self.config.server_list);
+
+        path = server_route?;
+        
+        log::info!("[server filter] path after server determination {} {}", method, path);
+
+        let body = construct_proxy_request_body_from_json(json_body.clone(), &mut headers).await;
+        
+        Ok(ProxyRequest {
+            method,
+            path,
+            query,
+            headers,
+            context,
+            body
+        })
     }
 }
 
-async fn get_username(request:ProxyRequest) -> Result<String, ProxyError> {
+async fn get_username(body:Value, headers : &mut HeaderMap) -> Result<String, ProxyError> {
     let mut username : String = String::from("");
 
-    if let Some(value) = request.clone().headers.get("x-capitec-username"){
+    if let Some(value) = headers.clone().get("x-capitec-username"){
         username = String::from(value.to_str().unwrap());
     } else {
-        let json_body = serialize_proxy_request_body(request).await;
-        username = String::from(json_body?.get("username").unwrap().as_str().unwrap());
+        username = String::from(body.get("username").unwrap().as_str().unwrap());
     }
 
     Ok((username))
 }
 
-async fn serialize_proxy_request_body(request: ProxyRequest) -> Result<Value, ProxyError>
+async fn construct_proxy_request_body_from_json(json_body : Value, headers: &mut reqwest::header::HeaderMap) -> Body {
+    let body : String = serde_json::to_string(&json_body).unwrap();
+    let updated_body_bytes = body.as_bytes();
+    let content_length = updated_body_bytes.len().to_string();
+    headers.insert("Content-Length", content_length.parse().unwrap());
+    reqwest::Body::from(body)
+}
+
+async fn serialize_proxy_request_body(body: Body) -> Value
 {
     // Read the stream into a Vec<u8>
-    let mut body_stream = request.clone().body.into_data_stream();
+    let mut body_stream = body.into_data_stream();
     let mut full_body = Vec::new();
 
     while let Some(chunk_result) = body_stream.next().await {
@@ -336,18 +371,11 @@ async fn serialize_proxy_request_body(request: ProxyRequest) -> Result<Value, Pr
     match String::from_utf8(full_body.clone()) {
         Ok(body_str) => {
             info!("Request body: {}", body_str);
-            Ok(serde_json::from_str::<Value>(&body_str).map_err(|e| {
-                let err = ProxyError::FilterError(format!("Failed to serialize proxy request body: {}", e));
-                log::error!("{}", err);
-                err
-            })?)
-        },
-        Err(e) => {
-            log::error!("Request body is not valid UTF-8: {}", e);
-            let err = ProxyError::FilterError(format!("Invalid logging filter config: {}", e));
-            log::error!("{}", err);
-            Err(err)
-        },
+            serde_json::from_str::<Value>(&body_str).unwrap()
+        }
+        _ => {
+            Value::Null
+        }
     }
 }
 
