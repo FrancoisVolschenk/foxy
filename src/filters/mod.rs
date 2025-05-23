@@ -309,8 +309,8 @@ async fn get_username(request:ProxyRequest) -> Result<String, ProxyError> {
     if let Some(value) = request.clone().headers.get("x-capitec-username"){
         username = String::from(value.to_str().unwrap());
     } else {
-        let jsonBody = serialize_proxy_request_body(request).await;
-        //TODO: get username from body
+        let json_body = serialize_proxy_request_body(request).await;
+        username = String::from(json_body?.get("username").unwrap().as_str().unwrap());
     }
 
     Ok((username))
