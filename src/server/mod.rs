@@ -339,6 +339,7 @@ async fn convert_hyper_request(
     req: Request<Incoming>,
     client_ip: String,
 ) -> Result<ProxyRequest, ProxyError> {
+    
     let method = HttpMethod::from(req.method());
     let uri = req.uri().clone();
     let path = uri.path().to_owned();
