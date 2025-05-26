@@ -166,6 +166,7 @@ pub struct ProxyRequest {
     pub headers: reqwest::header::HeaderMap,
     pub body: reqwest::Body,
     pub context: Arc<RwLock<RequestContext>>,
+    pub target: String,
 }
 
 impl Clone for ProxyRequest {
@@ -178,6 +179,7 @@ impl Clone for ProxyRequest {
             headers:  self.headers.clone(),
             body:     reqwest::Body::from(""),
             context:  self.context.clone(),
+            target: self.target.clone(),
         }
     }
 }

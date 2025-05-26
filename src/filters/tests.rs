@@ -22,7 +22,7 @@ mod tests {
     use std::collections::HashMap;
 
     // Helper function to create a test request
-    fn create_test_request(method: HttpMethod, path: &str, headers: Vec<(&'static str, &'static str)>, body: Vec<u8>) -> ProxyRequest {
+    fn create_test_request(method: HttpMethod, path: &str, headers: Vec<(&'static str, &'static str)>, body: Vec<u8>, target: &str) -> ProxyRequest {
         let mut header_map = reqwest::header::HeaderMap::new();
         for (name, value) in headers {
             header_map.insert(
@@ -38,18 +38,18 @@ mod tests {
             headers: header_map,
             body: Body::from(body),
             context: Arc::new(RwLock::new(RequestContext::default())),
+            target: target.to_string(),
         }
     }
 
     #[tokio::test]
     async fn test_logging_filter() {
         // Create a test request
-        let request = create_test_request(
-            HttpMethod::Get,
-            "/test",
-            vec![("content-type", "application/json")],
-            b"{\"test\": \"value\"}".to_vec()
-        );
+        let request = create_test_request(HttpMethod::Get, 
+                                          "/test", 
+                                          vec![("content-type", "application/json")], 
+                                          b"{\"test\": \"value\"}".to_vec(), 
+                                          "http://test.co.za");
 
         // Create a logging filter
         let config = LoggingFilterConfig {
@@ -79,7 +79,8 @@ mod tests {
                 ("content-type", "application/json"),
                 ("x-remove-me", "should be removed")
             ],
-            Vec::new()
+            Vec::new(),
+            "http://test.co.za"
         );
 
         // Create a header filter
@@ -112,7 +113,8 @@ mod tests {
             HttpMethod::Get,
             "/test",
             vec![],
-            Vec::new()
+            Vec::new(),
+            "http://test.co.za"
         );
 
         // Create a timeout filter
@@ -135,7 +137,8 @@ mod tests {
             HttpMethod::Get,
             "/api/users",
             vec![],
-            Vec::new()
+            Vec::new(),
+            "http://test.co.za"
         );
 
         // Create a path rewrite filter
@@ -161,7 +164,8 @@ mod tests {
             HttpMethod::Get,
             "/other/path",
             vec![],
-            Vec::new()
+            Vec::new(),
+            "http://test.co.za"
         );
 
         // Create a path rewrite filter
